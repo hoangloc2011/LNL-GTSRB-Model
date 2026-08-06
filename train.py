@@ -223,7 +223,21 @@ checkpoint_path = None
 
 # 1. Kiểm tra file best_val.pth trước
 best_val_path = os.path.join(checkpoint_dir, f"lnl_s_run_{run_id}_best_val.pth")
-if os.path.exists(best_val_path):
+
+# Nếu file chưa tồn tại HOẶC bị lỗi là file con trỏ LFS (dung lượng < 1MB), tự động tải trực tiếp từ GitHub
+if not os.path.exists(best_val_path) or os.path.getsize(best_val_path) < 1000000:
+    print("⏳ Phát hiện chưa có file Checkpoint 272MB thực sự (hoặc đang là file con trỏ LFS)...")
+    print("🚀 Đang tự động tải file Checkpoint tốt nhất (272MB) trực tiếp từ GitHub Media Server...")
+    lfs_url = "https://media.githubusercontent.com/media/hoangloc2011/LNL-GTSRB-Model/main/checkpoints/lnl_s_run_1_best_val.pth"
+    try:
+        req = urllib.request.Request(lfs_url, headers={'User-Agent': 'Mozilla/5.0'})
+        with urllib.request.urlopen(req) as response, open(best_val_path, 'wb') as out_file:
+            shutil.copyfileobj(response, out_file)
+        print("✓ Tải thành công tệp Checkpoint 272MB hoàn chỉnh!")
+    except Exception as e:
+        print(f"⚠️ Không thể tự động tải tệp LFS: {e}")
+
+if os.path.exists(best_val_path) and os.path.getsize(best_val_path) > 1000000:
     checkpoint_path = best_val_path
 
 # 2. Nếu không có best_val, tìm file epoch_*.pth lớn nhất
