@@ -1,0 +1,12 @@
+torch
+torchvision
+timm
+einops
+ptflops
+torchattacks
+matplotlib
+numpy
+pillow
+requests
+tqdm
+ipykernel

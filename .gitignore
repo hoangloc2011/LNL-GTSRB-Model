@@ -1,0 +1,26 @@
+# Virtual Environment
+venv/
+env/
+ENV/
+
+# Python cache & compiled files
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# Data & Model Checkpoints
+data/
+*.zip
+python_installer.exe
+
+# Ẩn các file checkpoint phụ, CHỈ GIỮ LẠI file best_val.pth
+checkpoints/lnl_s_run_*_epoch_*.pth
+checkpoints/lnl_s_run_*_latest.pth
+
+# Locality-iN-Locality (Đã là sub-repository / submodule)
+Locality-iN-Locality/
+
+# VS Code & IDE settings
+.vscode/
+.idea/
