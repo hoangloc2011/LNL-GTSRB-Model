@@ -271,10 +271,10 @@ if checkpoint_path and os.path.exists(checkpoint_path):
     if 'best_val_acc' in checkpoint:
         best_val_acc = checkpoint['best_val_acc']
     
-    # Nếu epoch đã đạt đến num_epochs, đánh dấu đã hoàn thành mô hình
-    if start_epoch >= num_epochs:
+    # Nếu nạp từ file best_val.pth HOẶC epoch đã đạt đến num_epochs, chuyển thẳng sang Test
+    if "best_val" in checkpoint_path or start_epoch >= num_epochs:
         has_completed_model = True
-        print(f"✓ Mô hình đã huấn luyện hoàn tất ({num_epochs}/{num_epochs} Epochs)! Chuyển thẳng sang đánh giá tập Test...")
+        print(f"✓ Đã nạp thành công Checkpoint tốt nhất (Val Acc: {best_val_acc:.2f}%)! Bỏ qua huấn luyện và chuyển thẳng sang Đánh giá tập Test...")
     else:
         print(f"✓ Khôi phục thành công từ Epoch {start_epoch}! Tiếp tục huấn luyện các epoch còn lại (Val Acc tốt nhất trước đó: {best_val_acc:.2f}%)")
 else:
