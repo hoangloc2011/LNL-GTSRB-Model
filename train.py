@@ -153,6 +153,9 @@ if not os.path.exists(train_dir) or not os.path.exists(val_dir):
     copy_split_files(train_split, train_dir)
     print("Đã hoàn tất phân chia tập dữ liệu!")
 
+# ---------------------------------------------------------
+# 5. Cấu hình Tham số & Khởi tạo DataLoaders
+# ---------------------------------------------------------
 import argparse
 
 parser = argparse.ArgumentParser(description="Huấn luyện mô hình LNL-S trên GTSRB")
@@ -216,9 +219,6 @@ loss_fn_ce = nn.CrossEntropyLoss(label_smoothing=0.1)
 loss_fn_ce_clean = nn.CrossEntropyLoss()
 
 optimizer = optim.AdamW(model.parameters(), lr=5e-4, weight_decay=0.05)
-num_epochs = 50
-warmup_epochs = 5
-cooldown_epochs = 10
 
 scheduler_warmup = optim.lr_scheduler.LinearLR(optimizer, start_factor=0.01, end_factor=1.0, total_iters=warmup_epochs)
 scheduler_cosine = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=num_epochs - warmup_epochs)
@@ -288,90 +288,90 @@ if __name__ == '__main__':
         print("\n================ BẮT ĐẦU HUẤN LUYỆN LNL-S ================")
         scaler = torch.amp.GradScaler('cuda') if torch.cuda.is_available() else None
 
-    for epoch in range(start_epoch, num_epochs):
-        model.train()
-        total_loss, correct, total = 0.0, 0, 0
-        start_time = time.time()
-        use_mixup = (epoch < num_epochs - cooldown_epochs)
+        for epoch in range(start_epoch, num_epochs):
+            model.train()
+            total_loss, correct, total = 0.0, 0, 0
+            start_time = time.time()
+            use_mixup = (epoch < num_epochs - cooldown_epochs)
 
-        if epoch == num_epochs - cooldown_epochs:
-            print(f"\n--- Bắt đầu giai đoạn Cooldown: Huấn luyện ảnh sạch không dùng Label Smoothing trong {cooldown_epochs} epoch ---")
+            if epoch == num_epochs - cooldown_epochs:
+                print(f"\n--- Bắt đầu giai đoạn Cooldown: Huấn luyện ảnh sạch không dùng Label Smoothing trong {cooldown_epochs} epoch ---")
 
-        for i, (images, labels) in enumerate(train_loader):
-            images, labels = images.to(device), labels.to(device)
-            optimizer.zero_grad()
+            for i, (images, labels) in enumerate(train_loader):
+                images, labels = images.to(device), labels.to(device)
+                optimizer.zero_grad()
 
-            if scaler:
-                with torch.amp.autocast('cuda'):
-                    if use_mixup:
-                        images_mixed, labels_mixed = mixup_fn(images, labels)
-                        outputs = model(images_mixed)
-                        loss = loss_fn_mixup(outputs, labels_mixed)
-                        _, predicted = torch.max(outputs.data, 1)
-                        _, target_max = torch.max(labels_mixed, dim=-1)
-                        correct += (predicted == target_max).sum().item()
-                    else:
-                        outputs = model(images)
-                        loss = loss_fn_ce_clean(outputs, labels)
-                        _, predicted = torch.max(outputs.data, 1)
-                        correct += (predicted == labels).sum().item()
-                scaler.scale(loss).backward()
-                scaler.unscale_(optimizer)
-                torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
-                scaler.step(optimizer)
-                scaler.update()
-            else:
-                outputs = model(images)
-                loss = loss_fn_ce_clean(outputs, labels)
-                loss.backward()
-                optimizer.step()
-                _, predicted = torch.max(outputs.data, 1)
-                correct += (predicted == labels).sum().item()
+                if scaler:
+                    with torch.amp.autocast('cuda'):
+                        if use_mixup:
+                            images_mixed, labels_mixed = mixup_fn(images, labels)
+                            outputs = model(images_mixed)
+                            loss = loss_fn_mixup(outputs, labels_mixed)
+                            _, predicted = torch.max(outputs.data, 1)
+                            _, target_max = torch.max(labels_mixed, dim=-1)
+                            correct += (predicted == target_max).sum().item()
+                        else:
+                            outputs = model(images)
+                            loss = loss_fn_ce_clean(outputs, labels)
+                            _, predicted = torch.max(outputs.data, 1)
+                            correct += (predicted == labels).sum().item()
+                    scaler.scale(loss).backward()
+                    scaler.unscale_(optimizer)
+                    torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+                    scaler.step(optimizer)
+                    scaler.update()
+                else:
+                    outputs = model(images)
+                    loss = loss_fn_ce_clean(outputs, labels)
+                    loss.backward()
+                    optimizer.step()
+                    _, predicted = torch.max(outputs.data, 1)
+                    correct += (predicted == labels).sum().item()
 
-            total_loss += loss.item() * images.size(0)
-            total += labels.size(0)
+                total_loss += loss.item() * images.size(0)
+                total += labels.size(0)
 
-            if (i + 1) % 200 == 0:
-                print(f"Epoch [{epoch+1}/{num_epochs}] - Step [{i+1}/{len(train_loader)}] - Loss: {loss.item():.4f} - Acc: {(correct/total)*100:.2f}%")
+                if (i + 1) % 200 == 0:
+                    print(f"Epoch [{epoch+1}/{num_epochs}] - Step [{i+1}/{len(train_loader)}] - Loss: {loss.item():.4f} - Acc: {(correct/total)*100:.2f}%")
 
-        scheduler.step()
-        epoch_loss = total_loss / total
-        epoch_acc = (correct / total) * 100
+            scheduler.step()
+            epoch_loss = total_loss / total
+            epoch_acc = (correct / total) * 100
 
-        # Đánh giá tập Val
-        model.eval()
-        val_correct, val_total = 0, 0
-        with torch.no_grad():
-            for val_images, val_labels in val_loader:
-                val_images, val_labels = val_images.to(device), val_labels.to(device)
-                val_outputs = model(val_images)
-                _, val_predicted = torch.max(val_outputs.data, 1)
-                val_total += val_labels.size(0)
-                val_correct += (val_predicted == val_labels).sum().item()
-        
-        val_acc = (val_correct / val_total) * 100
-        elapsed_time = time.time() - start_time
-        print(f"Epoch [{epoch+1}/{num_epochs}] - Loss: {epoch_loss:.4f} - Train Acc: {epoch_acc:.2f}% - Val Acc: {val_acc:.2f}% - Time: {elapsed_time:.1f}s")
+            # Đánh giá tập Val
+            model.eval()
+            val_correct, val_total = 0, 0
+            with torch.no_grad():
+                for val_images, val_labels in val_loader:
+                    val_images, val_labels = val_images.to(device), val_labels.to(device)
+                    val_outputs = model(val_images)
+                    _, val_predicted = torch.max(val_outputs.data, 1)
+                    val_total += val_labels.size(0)
+                    val_correct += (val_predicted == val_labels).sum().item()
+            
+            val_acc = (val_correct / val_total) * 100
+            elapsed_time = time.time() - start_time
+            print(f"Epoch [{epoch+1}/{num_epochs}] - Loss: {epoch_loss:.4f} - Train Acc: {epoch_acc:.2f}% - Val Acc: {val_acc:.2f}% - Time: {elapsed_time:.1f}s")
 
-        is_best = val_acc > best_val_acc
-        if is_best:
-            best_val_acc = val_acc
-            print(f"--> [BEST] Val Acc mới cao nhất: {best_val_acc:.2f}%! Đang lưu checkpoint best model...")
+            is_best = val_acc > best_val_acc
+            if is_best:
+                best_val_acc = val_acc
+                print(f"--> [BEST] Val Acc mới cao nhất: {best_val_acc:.2f}%! Đang lưu checkpoint best model...")
 
-        checkpoint_state = {
-            'epoch': epoch,
-            'model_state_dict': model.state_dict(),
-            'optimizer_state_dict': optimizer.state_dict(),
-            'scheduler_state_dict': scheduler.state_dict(),
-            'best_val_acc': best_val_acc
-        }
+            checkpoint_state = {
+                'epoch': epoch,
+                'model_state_dict': model.state_dict(),
+                'optimizer_state_dict': optimizer.state_dict(),
+                'scheduler_state_dict': scheduler.state_dict(),
+                'best_val_acc': best_val_acc
+            }
 
-        if is_best:
-            torch.save(checkpoint_state, os.path.join(checkpoint_dir, f"lnl_s_run_{run_id}_best_val.pth"))
-        torch.save(checkpoint_state, os.path.join(checkpoint_dir, f"lnl_s_run_{run_id}_latest.pth"))
+            if is_best:
+                torch.save(checkpoint_state, os.path.join(checkpoint_dir, f"lnl_s_run_{run_id}_best_val.pth"))
+            torch.save(checkpoint_state, os.path.join(checkpoint_dir, f"lnl_s_run_{run_id}_latest.pth"))
 
-        if (epoch + 1) % 5 == 0 or (epoch + 1) == num_epochs:
-            torch.save(checkpoint_state, os.path.join(checkpoint_dir, f"lnl_s_run_{run_id}_epoch_{epoch+1}.pth"))
+            if (epoch + 1) % 5 == 0 or (epoch + 1) == num_epochs:
+                torch.save(checkpoint_state, os.path.join(checkpoint_dir, f"lnl_s_run_{run_id}_epoch_{epoch+1}.pth"))
 
     # ---------------------------------------------------------
     # 9. Đánh giá Test & FGSM Attack
