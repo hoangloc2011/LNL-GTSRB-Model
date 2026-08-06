@@ -228,20 +228,28 @@ os.makedirs(checkpoint_dir, exist_ok=True)
 start_epoch = 0
 best_val_acc = 0.0
 
-checkpoint_pattern = os.path.join(checkpoint_dir, f"lnl_s_run_{run_id}_epoch_*.pth")
-checkpoint_files = glob.glob(checkpoint_pattern)
 checkpoint_path = None
 
-if checkpoint_files:
-    epochs = []
-    for f in checkpoint_files:
-        match = re.search(r'epoch_(\d+)\.pth$', f)
-        if match:
-            epochs.append((int(match.group(1)), f))
-    if epochs:
-        latest_epoch, latest_file = max(epochs, key=lambda x: x[0])
-        checkpoint_path = latest_file
+# 1. Ưu tiên kiểm tra file checkpoint tốt nhất (best_val.pth) trước
+best_val_path = os.path.join(checkpoint_dir, f"lnl_s_run_{run_id}_best_val.pth")
+if os.path.exists(best_val_path):
+    checkpoint_path = best_val_path
 
+# 2. Nếu không có best_val, tìm file epoch_*.pth có số Epoch lớn nhất
+if not checkpoint_path:
+    checkpoint_pattern = os.path.join(checkpoint_dir, f"lnl_s_run_{run_id}_epoch_*.pth")
+    checkpoint_files = glob.glob(checkpoint_pattern)
+    if checkpoint_files:
+        epochs = []
+        for f in checkpoint_files:
+            match = re.search(r'epoch_(\d+)\.pth$', f)
+            if match:
+                epochs.append((int(match.group(1)), f))
+        if epochs:
+            latest_epoch, latest_file = max(epochs, key=lambda x: x[0])
+            checkpoint_path = latest_file
+
+# 3. Nếu vẫn không thấy, kiểm tra file _latest.pth
 if not checkpoint_path:
     latest_path = os.path.join(checkpoint_dir, f"lnl_s_run_{run_id}_latest.pth")
     if os.path.exists(latest_path):
