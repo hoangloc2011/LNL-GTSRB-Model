@@ -13,6 +13,10 @@ import matplotlib.pyplot as plt
 # 1. Đảm bảo Python tìm thấy thư mục dự án Locality-iN-Locality
 # ---------------------------------------------------------
 PROJECT_DIR = os.path.abspath('./Locality-iN-Locality')
+if not os.path.exists(PROJECT_DIR):
+    print("Đang tự động tải mã nguồn kiến trúc mô hình Locality-iN-Locality...")
+    os.system("git clone https://github.com/Omid-Nejati/Locality-iN-Locality.git")
+
 if PROJECT_DIR not in sys.path:
     sys.path.append(PROJECT_DIR)
 
