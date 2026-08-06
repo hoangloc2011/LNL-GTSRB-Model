@@ -9,9 +9,6 @@ import zipfile
 import numpy as np
 import matplotlib.pyplot as plt
 
-# ---------------------------------------------------------
-# 1. Đảm bảo Python tìm thấy thư mục dự án Locality-iN-Locality
-# ---------------------------------------------------------
 PROJECT_DIR = os.path.abspath('./Locality-iN-Locality')
 if not os.path.exists(PROJECT_DIR):
     print("Đang tự động tải mã nguồn kiến trúc mô hình Locality-iN-Locality...")
@@ -39,9 +36,7 @@ print("Thiết bị tính toán:", device)
 if torch.cuda.is_available():
     print("GPU:", torch.cuda.get_device_name(0))
 
-# ---------------------------------------------------------
 # 2. Tự động sửa lỗi cú pháp 'return' trong LNL.py
-# ---------------------------------------------------------
 lnl_file_path = os.path.join(PROJECT_DIR, "LNL.py")
 if os.path.exists(lnl_file_path):
     with open(lnl_file_path, "r", encoding="utf-8") as f:
@@ -61,9 +56,7 @@ if os.path.exists(lnl_file_path):
 from LNL import LNL_S
 from LNL_MoEx import LNL_MoEx_S
 
-# ---------------------------------------------------------
 # 3. Tải và giải nén dữ liệu GTSRB
-# ---------------------------------------------------------
 data_dir = './data'
 gtsrb_dir = './data/GTSRB'
 os.makedirs(data_dir, exist_ok=True)
@@ -105,9 +98,8 @@ if not os.path.exists(os.path.join(data_dir, "GTSRB/Final_Test")):
 if not os.path.exists(os.path.join(data_dir, "GT-final_test.csv")):
     extract_zip("GTSRB_Final_Test_GT.zip", data_dir)
 
-# ---------------------------------------------------------
 # 4. Tổ chức thư mục test và chia tập Train (90%) - Val (10%)
-# ---------------------------------------------------------
+
 test_dir = os.path.join(gtsrb_dir, 'test')
 images_dir = os.path.join(gtsrb_dir, 'Final_Test/Images')
 csv_path = os.path.join(data_dir, 'GT-final_test.csv')
@@ -152,10 +144,8 @@ if not os.path.exists(train_dir) or not os.path.exists(val_dir):
     copy_split_files(val_split, val_dir)
     copy_split_files(train_split, train_dir)
     print("Đã hoàn tất phân chia tập dữ liệu!")
-
-# ---------------------------------------------------------
+    
 # 5. Cấu hình Tham số & Khởi tạo DataLoaders
-# ---------------------------------------------------------
 import argparse
 
 parser = argparse.ArgumentParser(description="Huấn luyện mô hình LNL-S trên GTSRB")
@@ -203,9 +193,7 @@ test_loader = torch.utils.data.DataLoader(dataset=testset, batch_size=8, shuffle
 
 print(f"Kích thước dữ liệu: Train={len(trainset)} | Val={len(valset)} | Test={len(testset)}")
 
-# ---------------------------------------------------------
 # 6. Khởi tạo Mô hình LNL-S
-# ---------------------------------------------------------
 model = LNL_S(pretrained=False, img_size=img_size)
 model.head = nn.Linear(in_features=model.head.in_features, out_features=43, bias=True)
 model = model.to(device)
@@ -224,9 +212,7 @@ scheduler_warmup = optim.lr_scheduler.LinearLR(optimizer, start_factor=0.01, end
 scheduler_cosine = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=num_epochs - warmup_epochs)
 scheduler = optim.lr_scheduler.SequentialLR(optimizer, schedulers=[scheduler_warmup, scheduler_cosine], milestones=[warmup_epochs])
 
-# ---------------------------------------------------------
 # 7. Quản lý Checkpoints & Quyết định Train/Test
-# ---------------------------------------------------------
 checkpoint_dir = './checkpoints'
 os.makedirs(checkpoint_dir, exist_ok=True)
 start_epoch = 0
@@ -280,9 +266,7 @@ if checkpoint_path and os.path.exists(checkpoint_path):
 else:
     print("Không tìm thấy checkpoint. Bắt đầu huấn luyện mới từ Epoch 0.")
 
-# ---------------------------------------------------------
 # 8. Vòng lặp Huấn luyện (Train Loop)
-# ---------------------------------------------------------
 if __name__ == '__main__':
     if not has_completed_model:
         print("\n================ BẮT ĐẦU HUẤN LUYỆN LNL-S ================")
@@ -373,9 +357,7 @@ if __name__ == '__main__':
             if (epoch + 1) % 5 == 0 or (epoch + 1) == num_epochs:
                 torch.save(checkpoint_state, os.path.join(checkpoint_dir, f"lnl_s_run_{run_id}_epoch_{epoch+1}.pth"))
 
-    # ---------------------------------------------------------
     # 9. Đánh giá Test & FGSM Attack
-    # ---------------------------------------------------------
     print("\n================ ĐÁNH GIÁ TRÊN TẬP TEST ================")
     best_val_path = os.path.join(checkpoint_dir, f"lnl_s_run_{run_id}_best_val.pth")
     if os.path.exists(best_val_path):
