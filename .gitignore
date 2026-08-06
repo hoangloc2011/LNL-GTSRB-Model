@@ -18,9 +18,6 @@ python_installer.exe
 checkpoints/lnl_s_run_*_epoch_*.pth
 checkpoints/lnl_s_run_*_latest.pth
 
-# Locality-iN-Locality (Đã là sub-repository / submodule)
-Locality-iN-Locality/
-
-# VS Code & IDE settings
+# IDE settings
 .vscode/
 .idea/
