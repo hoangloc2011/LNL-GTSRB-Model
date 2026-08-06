@@ -221,21 +221,22 @@ scheduler_cosine = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=num_epo
 scheduler = optim.lr_scheduler.SequentialLR(optimizer, schedulers=[scheduler_warmup, scheduler_cosine], milestones=[warmup_epochs])
 
 # ---------------------------------------------------------
-# 7. Quản lý Checkpoints
+# 7. Quản lý Checkpoints & Quyết định Train/Test
 # ---------------------------------------------------------
 checkpoint_dir = './checkpoints'
 os.makedirs(checkpoint_dir, exist_ok=True)
 start_epoch = 0
 best_val_acc = 0.0
+has_completed_model = False
 
 checkpoint_path = None
 
-# 1. Ưu tiên kiểm tra file checkpoint tốt nhất (best_val.pth) trước
+# 1. Kiểm tra file best_val.pth trước
 best_val_path = os.path.join(checkpoint_dir, f"lnl_s_run_{run_id}_best_val.pth")
 if os.path.exists(best_val_path):
     checkpoint_path = best_val_path
 
-# 2. Nếu không có best_val, tìm file epoch_*.pth có số Epoch lớn nhất
+# 2. Nếu không có best_val, tìm file epoch_*.pth lớn nhất
 if not checkpoint_path:
     checkpoint_pattern = os.path.join(checkpoint_dir, f"lnl_s_run_{run_id}_epoch_*.pth")
     checkpoint_files = glob.glob(checkpoint_pattern)
@@ -249,7 +250,7 @@ if not checkpoint_path:
             latest_epoch, latest_file = max(epochs, key=lambda x: x[0])
             checkpoint_path = latest_file
 
-# 3. Nếu vẫn không thấy, kiểm tra file _latest.pth
+# 3. Kiểm tra file _latest.pth
 if not checkpoint_path:
     latest_path = os.path.join(checkpoint_dir, f"lnl_s_run_{run_id}_latest.pth")
     if os.path.exists(latest_path):
@@ -265,7 +266,13 @@ if checkpoint_path and os.path.exists(checkpoint_path):
         scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
     if 'best_val_acc' in checkpoint:
         best_val_acc = checkpoint['best_val_acc']
-    print(f"✓ Khôi phục thành công từ Epoch {start_epoch}! Val Acc tốt nhất trước đó: {best_val_acc:.2f}%")
+    
+    # Nếu epoch đã đạt đến num_epochs, đánh dấu đã hoàn thành mô hình
+    if start_epoch >= num_epochs:
+        has_completed_model = True
+        print(f"✓ Mô hình đã huấn luyện hoàn tất ({num_epochs}/{num_epochs} Epochs)! Chuyển thẳng sang đánh giá tập Test...")
+    else:
+        print(f"✓ Khôi phục thành công từ Epoch {start_epoch}! Tiếp tục huấn luyện các epoch còn lại (Val Acc tốt nhất trước đó: {best_val_acc:.2f}%)")
 else:
     print("Không tìm thấy checkpoint. Bắt đầu huấn luyện mới từ Epoch 0.")
 
@@ -273,8 +280,9 @@ else:
 # 8. Vòng lặp Huấn luyện (Train Loop)
 # ---------------------------------------------------------
 if __name__ == '__main__':
-    print("\n================ BẮT ĐẦU HUẤN LUYỆN LNL-S ================")
-    scaler = torch.amp.GradScaler('cuda') if torch.cuda.is_available() else None
+    if not has_completed_model:
+        print("\n================ BẮT ĐẦU HUẤN LUYỆN LNL-S ================")
+        scaler = torch.amp.GradScaler('cuda') if torch.cuda.is_available() else None
 
     for epoch in range(start_epoch, num_epochs):
         model.train()
